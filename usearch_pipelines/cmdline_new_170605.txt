@@ -1,0 +1,59 @@
+
+
+
+
+
+#1
+multiple_join_paired_ends.py -i {raw_data} -o {joined}
+
+#1.5
+python multi_joined_summary(general).py -i {joined} -o {joined_ratio_summary} -pattern -updated
+
+#2 fastq_screen
+fastq_screen {joined}/*/*.fastq --outdir {screened} --nohits --aligner bowtie2
+
+#2.5
+python fq_screen_summary.py -j {joined} -s {screened} -o {screened_ratio_summary} -updated
+
+#3
+multiple_split_libraries_fastq.py -i {screened} -o {splited} --sampleid_indicator '.' -p ~/project/16s_pipelines/qiime_parameters.txt
+
+forward primer: TACGGRAGGCAGCAG
+reverse primer: AGGGTATCTAATCCT
+reverse rev-complement-version primer: AGGATTAGATACCCT
+
+#4 cutadapt to trim primer
+cutadapt -g {forward primer} -a {reverse rev-complement-version primer} -o {cutted_fq} {ori_fq} -n 2 -m 100 -q 30,30 > {log_file}
+
+#5 usearch
+usearch -fastq_filter splited/seqs.fastq -fastq_maxee 1.0 -fastaout splited/filted.fa
+
+#6
+#perl ~/tools/BMP/bmp-Qiime2Uparse.pl -i splited/filted.fa -o {uparsed_fa}
+
+#7
+usearch -fastx_uniques splited/filted.fa -fastaout splited/derep.fa -sizeout
+
+
+#9
+mkdir analysis;usearch -cluster_otus splited/derep.fa -otus analysis/otus_rep.fa -relabel OTU
+
+#10
+usearch -otutab splited/seqs.fastq -otus analysis/otus_rep.fa -otutabout analysis/otu_raw.tab -sample_delim _
+
+#
+biom summarize-table -i analysis/otu_raw.tab
+
+#11
+usearch -otutab_norm analysis/otu_raw.tab -sample_size 5000 -output analysis/otu_norm.tab
+
+
+# filter samples by sample size
+usearch -otutab_trim analysis/otu_raw.tab -min_sample_size 5000 -output analysis/otu_raw_filterd_5k.tab
+# filter OTUs by OTU size
+usearch -otutab_trim analysis/otu_raw_filterd_5k.tab -min_otu_size 2 -output analysis/otu_raw_filterd_5k_s2.tab
+# filter OTUs by OTU frequency
+usearch -otutab_trim analysis/otu_raw_filterd_5k.tab -min_otu_freq 0.001 -output analysis/otu_raw_filterd_5k_e3.tab
+
+#last
+python mircobiome_utils/routine_analysis.py
