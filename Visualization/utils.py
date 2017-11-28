@@ -1,17 +1,17 @@
-import pandas
+import pandas as pd
 from pandas import DataFrame as df
 from collections import defaultdict
 import numpy as np
 
 def read_data(fp):
     try:
-        first = df.from_csv(fp)
-        if len(first.columns)==0:
-            first = df.from_csv(fp,sep='\t')
+        first = pd.read_csv(fp)
+        if len(first.columns)==1 or len(first.columns) == 0 :
+            first = pd.read_table(fp,index_col=0)
         if len(first.columns)==0:
             print 'Unresolved delimiter.'
     except:
-        first = pandas.read_excel(fp)
+        first = pd.read_excel(fp)
 
     return first
 

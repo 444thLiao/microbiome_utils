@@ -56,3 +56,4 @@ layout = go.Layout(
 )
 fig = go.Figure(data=data, layout=layout)
 plotly.offline.plot(fig, filename=output_dir+'/sepcies_distribution')
+
