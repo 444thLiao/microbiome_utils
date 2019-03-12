@@ -1,3 +1,8 @@
+from __future__ import print_function
+import glob,os,re,argparse,tqdm
+
+from pandas import DataFrame as df
+
 """
 170905
 written by: TianHua Liao
@@ -10,8 +15,7 @@ There have four purpose in this script.
     4.calculate the reads maintain_ratio after joined process.
 
 """
-import glob,os,re,argparse
-from pandas import DataFrame as df
+
 
 #samplename_pattern = '(XK-[0-9]+F-?[0-9]{0,3}).*_R[12]'
 #samplename_pattern = re.findall('((NYN|NYT|TAN)-[0-9]+-?[NT]{0,1}-?[0-9]{0,2}).*_R[12]',path)[0][0]
@@ -25,7 +29,7 @@ def each_join_summary(dir_path):
     unj_reads_num1 = int(os.popen("grep -c '^+$' %s" % unjoined_file1).read())
     unj_reads_num2 = int(os.popen("grep -c '^+$' %s" % unjoined_file2).read())
     if unj_reads_num1 != unj_reads_num2:
-        print 'WARNING: R1 and R2 has different reads num.'
+        print('WARNING: R1 and R2 has different reads num.')
     return float(j_reads_num)/(j_reads_num+(unj_reads_num1+unj_reads_num2)/2),j_reads_num,j_reads_num+(unj_reads_num1+unj_reads_num2)/2
 
 def joined_summary(joined_result_dir,output_csv,samplename_pattern):
@@ -38,7 +42,7 @@ def joined_summary(joined_result_dir,output_csv,samplename_pattern):
     sample_joined_summary = []
     joined_reads = []
     total_reads = []
-    for each in glob.glob(joined_result_dir+'/*'):
+    for each in tqdm.tqdm(glob.glob(joined_result_dir+'/*')):
         if os.path.isdir(each):
             sample_name = os.path.basename(each)
             simply_sn = re.findall(samplename_pattern, sample_name)[0]
@@ -54,14 +58,14 @@ def joined_summary(joined_result_dir,output_csv,samplename_pattern):
 
 def rename_delete(joined_result_dir,samplename_pattern):
     os.system('rm %s/*/*.un[12].fastq' % joined_result_dir)
-    for each in glob.glob(joined_result_dir + '/*'):
+    for each in tqdm.tqdm(glob.glob(joined_result_dir + '/*')):
         if os.path.isdir(each):
             sample_name = os.path.basename(each)
             simplify_sn = re.findall(samplename_pattern, sample_name)[0]
             try:
                 os.rename(joined_result_dir+'/'+sample_name,joined_result_dir+'/'+simplify_sn)
             except:
-                print each
+                print(each)
             with open(joined_result_dir + '/' + simplify_sn+'/fastqjoin.join.fastq') as data:
                 buffer_str = ''
                 for i in data:
@@ -89,21 +93,22 @@ if __name__ == '__main__':
     args = parser.parse_args()
     joined_result_dir = os.path.abspath(args.jrd)
     pattern = args.pattern
-    output_csv = os.path.abspath(args.oc)
+    output_csv = os.path.abspath(os.path.abspath(args.oc))
 
 
     if not os.path.isfile(output_csv):
         # import pdb;pdb.set_trace()
-        test = raw_input("Rename from %s to %s. \nIf you sure about this,please enter Y/y:\n If you want to change this re pattern please use -pm." % (glob.glob(joined_result_dir + '/*')[0],re.findall(pattern, glob.glob(joined_result_dir + '/*')[0])[0]))
+        test = input("Rename from %s to %s. \nIf you sure about this,please enter Y/y:\n If you want to change this re pattern please use -pattern." % (glob.glob(joined_result_dir + '/*')[0],re.findall(pattern, glob.glob(joined_result_dir + '/*')[0])[0]))
         if test.upper() == 'Y':
             joined_summary(joined_result_dir,output_csv,pattern)
         else:
-            print 'Exit now.'
+            print('Exit now.')
             exit(0)
     else:
-        print 'Output file already exist, please make sure and delete it.'
+        print('Output file already exist, please make sure and delete it.')
         pass
     if args.updated_or_not:
+        print('Updating file name and its contents.')
         rename_delete(joined_result_dir,pattern)
     else:
-        print 'Processing completed, exit now...'
+        print('Processing completed, exit now...')

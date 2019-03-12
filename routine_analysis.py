@@ -1,9 +1,11 @@
+from __future__ import print_function
 import os
-from utils import tax_anno,norm_otu
+from utils import tax_anno,norm_otu,remove_colon
 import argparse
-USEARCH = '/usr/bin/usearch'
+USEARCH = '/home/liaoth/tools/usearch'
 RDP_DB = '~/data2/rdp_16s_v16.fa'
-draw_PD = "../Visualization/draw_PD.py"
+draw_PD = "/home/liaoth/project/16s_pipelines/microbiome_utils/Visualization/draw_PD.py"
+draw_stack_dis = "/home/liaoth/data2/project/16s_pipelines/microbiome_utils/Visualization/draw_stack_bar_plus.py"
 def regular_analysis(OTU_table,rep_fa,outputdir,draw_pd = False):
     """
     OTU_TABLE is normalize and filtered.
@@ -13,24 +15,26 @@ def regular_analysis(OTU_table,rep_fa,outputdir,draw_pd = False):
     :return:
     """
     if not os.path.isdir(outputdir):
-        os.makedirs(outputdir)
-    os.makedirs(outputdir+'/beta')
-    os.makedirs(outputdir+'/alpha')
-    os.makedirs(outputdir + '/rarefaction')
-    os.makedirs(outputdir + '/taxonomy_report')
-    print '%s -cluster_agg %s -treeout %s' % (USEARCH,
+        os.system('mkdir -p %s;' % outputdir)
+    remove_colon(rep_fa)
+    rep_fa = rep_fa.replace('fasta','fixed.fasta')
+    os.system('mkdir -p %s;' % (outputdir+'/beta_diversity'))
+    os.system('mkdir -p %s;' % (outputdir+'/alpha_diversity'))
+    os.system('mkdir -p %s;' % (outputdir + '/rarefaction'))
+    os.system('mkdir -p %s;' % (outputdir + '/taxonomy_report'))
+    print('%s -cluster_agg %s -treeout %s' % (USEARCH,
                                                   rep_fa,
-                                                  os.path.join(outputdir,'otus.tree'))
+                                                  os.path.join(outputdir,'otus.tree')))
     os.system('%s -cluster_agg %s -treeout %s' % (USEARCH,
                                                   rep_fa,
                                                   os.path.join(outputdir,'otus.tree')))
-    os.system('%s -alpha_div %s -output %s' % (USEARCH,
+    os.system("%s -alpha_div %s -output '%s'" % (USEARCH,
                                                OTU_table,
-                                               os.path.join(outputdir+'/alpha', 'alpha.txt')))
-    os.system('%s -beta_div %s -tree %s -filename_prefix %s' % (USEARCH,
+                                               os.path.join(outputdir+'/alpha_diversity', 'alpha.txt')))
+    os.system("%s -beta_div %s -tree %s -filename_prefix '%s'" % (USEARCH,
                                                                 OTU_table,
                                                                 os.path.join(outputdir, 'otus.tree'),
-                                                                outputdir + '/beta/'))
+                                                                outputdir + '/beta_diversity/'))
     os.system("%s -sintax %s -db %s -strand both -tabbedout %s -sintax_cutoff 0.8" % (USEARCH,
                                                                                       rep_fa,
                                                                                       RDP_DB,
@@ -38,6 +42,7 @@ def regular_analysis(OTU_table,rep_fa,outputdir,draw_pd = False):
     os.system("%s -alpha_div_rare %s -output %s/rare.txt" % (USEARCH,
                                                              OTU_table,
                                                              outputdir + '/rarefaction'))
+
     for taxs in [('g','genus'),('p','phylum'),('f','family')]:
         tax_summary_out_file = os.path.join(outputdir + '/taxonomy_report', '%s_%s.txt' % (os.path.basename(OTU_table).split('.')[0],taxs[1]))
 
@@ -48,13 +53,15 @@ def regular_analysis(OTU_table,rep_fa,outputdir,draw_pd = False):
 
         norm_otu(tax_summary_out_file,
                  tax_summary_out_file.replace('.txt','.norm.txt'))
+    os.system('python3 %s %s' % (draw_stack_dis,os.path.join(outputdir + '/taxonomy_report')))
+
     if draw_pd:
-        os.system("python %s -t %s -i %s -o %s -M shannon,observed_otus,faith_pd" % (draw_PD,
+        os.system("python3 %s -t %s -i %s -o %s -M shannon,observed_otus,faith_pd" % (draw_PD,
                                                    os.path.join(outputdir, 'otus.tree'),
                                                    OTU_table,outputdir + '/rarefaction'))
 
     os.system('cp %s %s' % (OTU_table,outputdir+'/'))
-    os.system('cp %s %s' % (rep_fa, outputdir + '/'))
+    os.system('cp %s %s' % (rep_fa, outputdir + '/otu_rep_seq.fasta'))
 
 # regular_analysis('/home/liaoth/data2/16s/shandong/16s_pipelines/v_analysis_dechimera/duplicate_sample/redo_way/otu_norm_filtered_40k_s2.tab',
 #                  '/home/liaoth/data2/16s/shandong/16s_pipelines/v_analysis_dechimera/duplicate_sample/redo_way/otus_rep.fa',
@@ -72,9 +79,9 @@ if __name__ == '__main__':
                         help="if you want to draw a rarefaction curve(which will take long time.But it will have a progress bar to display its.)")
     args = parser.parse_args()
 
-    otu_tab = args.otutab
-    fasta = args.fasta
-    odir = args.odir
+    otu_tab = os.path.abspath(args.otutab)
+    fasta = os.path.abspath(args.fasta)
+    odir = os.path.abspath(args.odir)
     draw_rc = args.rarefaction
 
     regular_analysis(otu_tab,fasta,odir,draw_pd=draw_rc)

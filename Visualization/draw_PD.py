@@ -1,3 +1,4 @@
+from __future__ import print_function
 import argparse
 import os
 import pandas
@@ -83,9 +84,9 @@ def generate_step(step,maxiumn):
     generate_range = []
     small_bin = range(0,step+1,100)[1:]
     for idx,small_max in enumerate(small_bin[1:]):
-        for s_step in range(small_bin[idx],small_max+1,small_bin[idx]/10):
+        for s_step in range(small_bin[idx],small_max+1,int(small_bin[idx]/10)):
             generate_range.append(s_step)
-    return generate_range+range(step,maxiumn+1,step)
+    return generate_range+list(range(step,maxiumn+1,step))
 
 def multiprocess_subsample(bucket,ori_otu, num, prebuild_dict):
     bucket.extend([subsampling(ori_otu, num, prebuild=prebuild_dict)])
@@ -102,7 +103,7 @@ def diversity_ana(metric,subsample,ids,**kwargs):
         try:
             each = alpha_diversity(metric, subsample, ids=ids)
         except:
-            print 'Metric you can use is listed below: \n' + '\n'.join(get_alpha_diversity_metrics())
+            print('Metric you can use is listed below: \n' + '\n'.join(get_alpha_diversity_metrics()))
             exit()
     return each
 
@@ -136,7 +137,7 @@ if __name__ == '__main__':
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
     if args.list_metric:
-        print 'Metric you can use is listed below: \n' + '\n'.join(get_alpha_diversity_metrics())
+        print('Metric you can use is listed below: \n' + '\n'.join(get_alpha_diversity_metrics()))
         exit()
     metric = args.metric
     if ',' in metric:
@@ -156,14 +157,14 @@ if __name__ == '__main__':
         tree = None
 
     # Above all is parse the argument.
-    print 'Start building the query dict'
+    print('Start building the query dict')
     prebuild_dict = defaultdict(list)
     for s in list(ori_otu.columns):
         prebuild_dict[s] = sum(map(lambda y: [y[0]] * y[1], zip(ori_otu.index, list(ori_otu.loc[:, s]))), [])
         # for r in list(ori_otu.index):
         #     prebuild_dict[s] += [r] * ori_otu.loc[r, s]
 
-    print 'Down the query dict. Start the progressBar.'
+    print('Down the query dict. Start the progressBar.')
     # Build the query dict.
     # each sample: a list include 'OTU' and weighted by it num in matrix.
 
@@ -253,7 +254,7 @@ if __name__ == '__main__':
         if not os.path.isfile(fn):
             plotly.offline.plot(fig, filename=fn)
         else:
-            button = raw_input(
+            button = input(
                 "There are existed html in your dir. If you want to overlap this. Enter 'Y/y',or enter a new filepath(include dir and file name).")
             if button.upper() == 'Y':
                 plotly.offline.plot(fig, filename=fn)

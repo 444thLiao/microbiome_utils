@@ -44,7 +44,7 @@ for idx,_i in enumerate(list(tax_otus_index)):
         name=_i,
         # name will display at legend.
         marker=dict(color=colors[idx],
-                    line=dict(width=1,color='#FFFFFF')
+                    line=dict(width=0,color='#FFFFFF')
                     # use white line to separate the bar, it can use it to make it more clear.
                     )
     ))

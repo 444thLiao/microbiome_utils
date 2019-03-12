@@ -1,13 +1,13 @@
 
 
-import glob,os
+import glob,os,tqdm
 
-raw_data_dir = '/home/liaoth/data2/16s/171027_16s/raw_data/second_splited/'
+raw_data_dir = '/home/liaoth/data_bank/t2d_from_HMP/16s_raw_data/'
 all_file = glob.glob(raw_data_dir+'*.fastq.gz')
 all_id = list(set([_i.split('/')[-1].split('_')[0] for _i in all_file]))
 
 
-for sample_id in all_id:
+for sample_id in tqdm.tqdm(all_id):
     paths = sorted(glob.glob('%s/%s_*' % (raw_data_dir,sample_id)))
     des_path = os.path.dirname(paths[0])
 

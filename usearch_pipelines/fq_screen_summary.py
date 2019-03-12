@@ -1,6 +1,6 @@
 import os,glob,argparse,re
 from pandas import DataFrame as df
-
+import tqdm
 
 #For joined screened accessment
 
@@ -24,8 +24,8 @@ def reads_num_summary(raw_dir,screened_dir,output_csv):
     sample_processed_summary = []
     processed_reads = []
     ori_reads = []
-    for each in glob.glob(raw_dir+'/*'):
-        if os.path.isdir(each):
+    for each in tqdm.tqdm(glob.glob(raw_dir+'/*')):
+        if os.path.isdir(each) and glob.glob(screened_dir+'/%s*' % os.path.basename(each)):
             sample_name = os.path.basename(each)
             sample_names.append(sample_name)
             r_nums = each_join_summary(raw_dir,screened_dir,sample_name)
@@ -41,7 +41,7 @@ def reads_num_summary(raw_dir,screened_dir,output_csv):
 
 
 def rename_delete(screened_dir):
-    for each in glob.glob(screened_dir + '/*.tagged_filter.fastq'):
+    for each in tqdm.tqdm(glob.glob(screened_dir + '/*.tagged_filter.fastq')):
         sample_name = os.path.basename(each)
         simplify_sn = sample_name.replace('.tagged_filter','')
         os.rename(each,screened_dir+'/'+simplify_sn)
@@ -77,8 +77,8 @@ if __name__ == '__main__':
         reads_num_summary(joined_result_dir,screened_result_dir,output_csv)
 
     if args.updated_or_not:
-        print 'Starting delete and rename......'
+        print('Starting delete and rename......')
         rename_delete(screened_result_dir)
-        print 'Completeing.'
+        print('Completeing.')
     else:
-        print 'Processing completed, exit now...'
+        print('Processing completed, exit now...')

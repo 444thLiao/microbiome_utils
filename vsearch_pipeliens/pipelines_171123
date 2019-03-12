@@ -15,45 +15,63 @@
 cutadapt -g {forward_primer} -a {reverse_rev_complement_version_primer} -o {cutted_fq} {ori_fq} -n 2 -m 250 -q 30,30 > {log_file}
 
 
-vsearch --fastx_filter merged/all_cutted.fastq.gz --fastq_maxee 1.0 --fastq_trunclen 240 --fastaout 16s_pipelines/filtered.fa --fasta_width 0
+vsearch --fastx_filter splited/seqs.fastq --fastq_maxee 1.0 --fastq_trunclen 240 --fastaout splited/filtered.fa --fasta_width 0
 
-perl ~/tools/BMP/bmp-Qiime2Uparse_shandong.pl -i 16s_pipelines/filtered.fa -o 16s_pipelines/filtered_uparsed.fa
+perl ~/tools/BMP/bmp-Qiime2Uparse.pl -i splited/filtered.fa -o splited/filtered_uparsed.fa
 
-vsearch --derep_fulllength 16s_pipelines/filtered_uparsed.fa --output 16s_pipelines/derep.fa --sizeout --fasta_width 0 --uc all.derep.uc
+vsearch --derep_fulllength splited/filtered_uparsed.fa --output splited/derep.fa --sizeout --fasta_width 0 --uc splited/all.derep.uc
 
-vsearch --sortbysize derep.fa --output sorted_d2.fa --minsize 2 --fasta_width 0
+vsearch --sortbysize splited/derep.fa --output splited/sorted_d2.fa --minsize 2 --fasta_width 0
 
 ######################################
 #another line (Offer by vsearch github wiki. Need to remove and detect chimera first.
-vsearch --cluster_size derep.fa \
+mkdir v_analysis
+vsearch --cluster_size splited/derep.fa \
 	--id 0.97 --sizeout --fasta_width 0\
-	--uc v_analysis2/all.preclustered.uc \
-	--centroids v_analysis2/all.preclustered.fasta
+	--uc v_analysis/all.preclustered.uc \
+	--centroids v_analysis/all.preclustered.fasta
 
-vsearch --uchime_deno v_analysis/otus1.fa \
+vsearch --uchime_deno v_analysis/all.preclustered.fasta \
 	--sizein --sizeout --fasta_width 0 \
-	--nonchimeras v_analysis2/all.denovo.nonchimeras.fastaq
+	--nonchimeras v_analysis/all.denovo.nonchimeras.fastaq
 
-vsearch --uchime_ref v_analysis2/all.denovo.nonchimeras.fastaq \
-	--db ~/tools/rdp_gold.fa --sizein --sizeout --fasta_width 0 \
-	--nonchimeras v_analysis2/all.ref.nonchimeras.fasta
+vsearch --uchime_ref v_analysis/all.denovo.nonchimeras.fastaq \
+	--db /home/liaoth/data2/project/16s_pipelines/microbiome_utils/vsearch_pipeliens/rdp_gold.fa --sizein --sizeout --fasta_width 0 \
+	--nonchimeras v_analysis/all.ref.nonchimeras.fasta
 
-perl ~/tools/map.pl derep.fa all.preclustered.uc v_analysis2/all.ref.nonchimeras.fasta > v_analysis2/all.nonchimeras.derep.fasta
+perl /home/liaoth/data2/project/16s_pipelines/microbiome_utils/vsearch_pipeliens/map.pl splited/derep.fa v_analysis/all.preclustered.uc v_analysis/all.ref.nonchimeras.fasta > v_analysis/all.nonchimeras.derep.fasta
 
-perl ~/tools/map.pl derep.fa all.derep.uc v_analysis2/all.nonchimeras.derep.fasta > v_analysis2/all.nonchimeras.fasta
+perl /home/liaoth/data2/project/16s_pipelines/microbiome_utils/vsearch_pipeliens/map.pl splited/derep.fa splited/all.derep.uc v_analysis/all.nonchimeras.derep.fasta > v_analysis/all.nonchimeras.fasta
 
-vsearch --cluster_size v_analysis2/all.nonchimeras.fasta --id 0.97 \
+vsearch --cluster_size v_analysis/all.nonchimeras.fasta --id 0.97 \
 	--sizein --sizeout --fasta_width 0 \
-	--uc v_analysis2/all.clustered.uc \
-	--relabel OTU --centroids v_analysis2/all.otus.fasta
+	--uc v_analysis/all.clustered.uc \
+	--relabel OTU --centroids v_analysis/all.otus.fasta
 
-vsearch --usearch_global filtered_uparsed.fa --db v_analysis2/all.otus.fasta --strand plus --id 0.97 --uc v_analysis2/map.txt --otutabout v_analysis2/otu_raw.tab
+vsearch --usearch_global splited/filtered_uparsed.fa --db v_analysis/all.otus.fasta --strand plus --id 0.97 --uc v_analysis2map.txt --otutabout v_analysis/otu_raw.tab
 ######################################
 
+######## clusting without detect chimera
+## vsearch --cluster_size sorted_d2.fa --centroids v_analysis/otus1.fa --id 0.97 --sizeout --fasta_width 0 --relabel OTU --uc all.preclustered.uc
+## fasta_formatter -i otus1.fa -o formated_otus1.fa
+## vsearch --usearch_global filtered_uparsed.fa --db v_analysis/otus1.fa --strand plus --id 0.97 --uc map.txt --otutabout v_analysis/otu_raw.tab
 
-vsearch --cluster_size sorted_d2.fa --centroids v_analysis/otus1.fa --id 0.97 --sizeout --fasta_width 0 --relabel OTU --uc all.preclustered.uc
+biom summarize-table -i v_analysis/otu_raw.tab
 
-fasta_formatter -i otus1.fa -o formated_otus1.fa
+#11
+usearch -otutab_norm v_analysis/otu_raw.tab -sample_size 5000 -output otu_norm_5k.tab
+usearch -otutab_trim otu_norm_5k.tab -min_otu_size 5 -output otu_norm_5k_s5.tab
 
 
-vsearch --usearch_global filtered_uparsed.fa --db v_analysis/otus1.fa --strand plus --id 0.97 --uc map.txt --otutabout v_analysis/otu_raw.tab
+
+# filter samples by sample size
+usearch -otutab_trim v_analysis/otu_raw.tab -min_sample_size 5000 -output v_analysis/otu_raw_filterd_5k.tab
+    # norm
+    usearch -otutab_norm v_analysis/otu_raw_filterd_5k.tab -sample_size 5000 -output otu_norm_5k.tab
+    # or
+    usearch -otutab_norm v_analysis/otu_raw.tab -sample_size 5000 -output otu_norm_5k.tab
+# filter OTUs by OTU size
+usearch -otutab_trim otu_norm_5k.tab -min_otu_size 5 -output otu_norm_5k_s5.tab
+# filter OTUs by OTU frequency
+usearch -otutab_trim otu_norm_5k.tab -min_otu_freq 0.00001 -output otu_norm_5k_e5.tab
+

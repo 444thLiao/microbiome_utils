@@ -1,3 +1,4 @@
+from __future__ import print_function
 import pandas as pd
 import numpy as np
 import csv
@@ -32,7 +33,7 @@ def get_otu_tax(infile, otus,c=0.8,filter=None):
             otu_id, tax_predicted, strand, tax_assigned = row
             if otu_id in otus:
                 if strand != '+':
-                    print 'Warning: OTU in minus strand: %s' % (otu_id,)
+                    print('Warning: OTU in minus strand: %s' % (otu_id,))
                 tax_ranks = [parse_tax(tax) for tax in tax_predicted.split(',')]
                 tax_ranks_prune = [tax_rank for tax_rank in tax_ranks if tax_rank[-1] >= c]
                 for i in range(len(tax_ranks_prune)):
@@ -62,7 +63,7 @@ def get_tax_profile(otu_tab, otu_tax):
         tax_profile[tax_name] = otu_tab.loc[:,otus].sum(axis=1)
     return tax_profile
 
-def run_boruta(tax_file,otu_tab,group_method,filter=None,fn=None,output_result_dir=None,subset_otu=None,max_depth=5,max_iter=1000):
+def run_boruta(tax_file,otu_tab,group_method,filter=None,fn=None,output_result_dir=None,subset_otu=None,max_depth=5,max_iter=1000,is_normalized=False):
     """
 
     :param tax_file:
@@ -70,35 +71,45 @@ def run_boruta(tax_file,otu_tab,group_method,filter=None,fn=None,output_result_d
     :param group_method: a function to group the sample, receive each sample,return a group label.
     :param filter: receive a tax level abbre. Such as, if you want genus level only without upper or lower,you can type 'g'.
     :param fn: output html absoulute filename.
-    :param subset_otu:
+    :param subset_otu: samples name you want to use only
     :return:
     """
 
     otu_tab = read_data(otu_tab)
+    # check
+    if not otu_tab.index.values[0].startswith('OTU'):
+        otu_tab = otu_tab.T
+
     if subset_otu:
         otu_tab = otu_tab.loc[:,subset_otu]
         otu_tab = otu_tab[otu_tab.sum(1)!=0]
 
-    otus = otu_tab.index.values.tolist()
-    otu_tax = get_otu_tax(tax_file,otus, filter=filter)
     # transpose into samples (rows) by OTUs (cols)
     otu_tab = otu_tab.T
+    if not is_normalized:
+        # normalization into relative abundance
+        otu_tab = otu_tab.div(otu_tab.sum(axis=1), axis=0)
 
     otu_tab = otu_tab.loc[:, otu_tab.sum(0) != 0]
+    otus = otu_tab.columns.values.tolist()
 
+    otu_tax = get_otu_tax(tax_file, otus, filter=filter)
     # propagate with tax profiles
-    tax_tab = get_tax_profile(otu_tab, otu_tax)
+    try:
+        tax_tab = get_tax_profile(otu_tab, otu_tax)
+    except:
+        import pdb;pdb.set_trace()
     # tax_tab
     # get sample metadata
     samples = list(tax_tab.index)
-    groups = map(group_method, samples)
+    groups = [_ for _ in map(group_method, samples)]
 
 
     ###########################################################################################
     ### boruta ################################################################################
     ###########################################################################################
     X = tax_tab.values
-    print X.shape
+    print(X.shape)
     y = groups
     features = tax_tab.columns
     max_depth = max_depth
@@ -122,10 +133,10 @@ def run_boruta(tax_file,otu_tab,group_method,filter=None,fn=None,output_result_d
     #print feat_selector.ranking_
     # call transform() on X to filter it down to selected features
     # X_filtered = feat_selector.transform(X)
-    print "confirmed features:"
-    print features[feat_selector.support_]
-    print "tentative features:"
-    print features[feat_selector.support_weak_]
+    print("confirmed features:")
+    print(features[feat_selector.support_])
+    print("tentative features:")
+    print(features[feat_selector.support_weak_])
     # find out the trend of importances.
     fea_status = []
     if len(set(y)) == 2:
@@ -134,16 +145,16 @@ def run_boruta(tax_file,otu_tab,group_method,filter=None,fn=None,output_result_d
             med_a = np.median(tax_tab.loc[ [i for i,v in zip(tax_tab.index.values.tolist(),y) if v == a] ,fea])
             med_b = np.median(tax_tab.loc[ [i for i,v in zip(tax_tab.index.values.tolist(),y) if v == b] ,fea])
             if med_a >= med_b:
-                fea_status.append('(%s > %s) ' % (a,b))
+                fea_status.append('(%s > %s)' % (a,b))
             else:
                 fea_status.append('(%s < %s)' % (a, b))
         features = np.array([i + v for i,v in zip(features.values.tolist(),fea_status)])
     # get feature importances
-    forest = RandomForestClassifier(n_jobs=-1, class_weight='balanced', max_depth=max_depth,
-                                    random_state=123, n_estimators=max_iter)
-    forest.fit(X, y)
-    importances = forest.feature_importances_
-    std = np.std([tree.feature_importances_ for tree in forest.estimators_], axis=0)
+    # forest = RandomForestClassifier(n_jobs=-1, class_weight='balanced', max_depth=max_depth,
+    #                                 random_state=123, n_estimators=max_iter)
+    # forest.fit(X, y)
+    importances = feat_selector._get_imp(X, y)
+    std = np.std([tree.feature_importances_ for tree in feat_selector.estimator.estimators_], axis=0)
     # reverse sorted index
     colors = np.empty(len(features), dtype=object)
     colors.fill('blue')
@@ -151,7 +162,7 @@ def run_boruta(tax_file,otu_tab,group_method,filter=None,fn=None,output_result_d
     colors[feat_selector.support_weak_] = 'yellow'
     indices = np.argsort(importances)
     selected_indices = indices[-40:]
-    print selected_indices
+    print(selected_indices)
     trace = go.Bar(y=features[selected_indices],
                    x=importances[selected_indices],
                    marker=dict(color=colors[selected_indices]),
@@ -161,10 +172,6 @@ def run_boruta(tax_file,otu_tab,group_method,filter=None,fn=None,output_result_d
     layout = go.Layout(title="Feature importances",
                        margin=go.Margin(l=800))
     fig = go.Figure(data=[trace], layout=layout)
-    if fn:
-        ply.plot(fig,filename=fn)
-    else:
-        ply.plot(fig)
     if output_result_dir:
         if not os.path.isdir(output_result_dir):
             os.makedirs(output_result_dir)
@@ -174,6 +181,11 @@ def run_boruta(tax_file,otu_tab,group_method,filter=None,fn=None,output_result_d
         tmp = pd.DataFrame(index=features[indices],columns=['importances'])
         tmp.loc[:,'importances'] = importances[indices]
         tmp.to_csv(output_result_dir + '/fetures_importances.tab', sep='\t')
+    if fn:
+        ply.plot(fig,filename=fn)
+    else:
+        ply.plot(fig)
+
 
 
 
@@ -211,7 +223,7 @@ if __name__ == '__main__':
     ### boruta ################################################################################
     ###########################################################################################
     X = tax_tab.values
-    print X.shape
+    print(X.shape)
     y = groups
     features = tax_tab.columns
     max_depth = 5
@@ -233,10 +245,10 @@ if __name__ == '__main__':
     #print feat_selector.ranking_
     # call transform() on X to filter it down to selected features
     # X_filtered = feat_selector.transform(X)
-    print "confirmed features:"
-    print features[feat_selector.support_]
-    print "tentative features:"
-    print features[feat_selector.support_weak_]
+    print("confirmed features:")
+    print(features[feat_selector.support_])
+    print("tentative features:")
+    print(features[feat_selector.support_weak_])
 
     # get feature importances
     forest = RandomForestClassifier(n_jobs=-1, class_weight='auto', max_depth=max_depth,
@@ -251,7 +263,7 @@ if __name__ == '__main__':
     colors[feat_selector.support_weak_] = 'yellow'
     indices = np.argsort(importances)
     selected_indices = indices[-40:]
-    print selected_indices
+    print(selected_indices)
     trace = go.Bar(y=features[selected_indices],
                    x=importances[selected_indices],
                    marker=dict(color=colors[selected_indices]),

@@ -4,19 +4,19 @@
 
 
 #1
-multiple_join_paired_ends.py -i {raw_data} -o {joined}
+multiple_join_paired_ends.py -i raw_data -o joined
 
 #1.5
-python multi_joined_summary(general).py -i {joined} -o {joined_ratio_summary} -pattern -updated
+python /home/liaoth/project/16s_pipelines/microbiome_utils/usearch_pipelines/multi_joined_summary(general).py -i joined -o joined_ratio_summary.csv -pattern -updated
 
 #2 fastq_screen
-fastq_screen {joined}/*/*.fastq --outdir {screened} --nohits --aligner bowtie2
+fastq_screen joined/*/*.fastq --outdir screened --nohits --aligner bowtie2
 
 #2.5
-python fq_screen_summary.py -j {joined} -s {screened} -o {screened_ratio_summary} -updated
+python /home/liaoth/project/16s_pipelines/microbiome_utils/usearch_pipelines/fq_screen_summary.py -j joined -s screened -o screened_ratio_summary.csv -updated
 
 #3
-multiple_split_libraries_fastq.py -i {screened} -o {splited} --sampleid_indicator '.' -p ~/project/16s_pipelines/qiime_parameters.txt
+multiple_split_libraries_fastq.py -i screened -o splited --sampleid_indicator '.' -p ~/project/16s_pipelines/qiime_parameters.txt
 
 forward primer: TACGGRAGGCAGCAG
 reverse primer: AGGGTATCTAATCCT
@@ -29,17 +29,17 @@ cutadapt -g {forward primer} -a {reverse rev-complement-version primer} -o {cutt
 usearch -fastq_filter splited/seqs.fastq -fastq_maxee 1.0 -fastaout splited/filted.fa
 
 #6
-#perl ~/tools/BMP/bmp-Qiime2Uparse.pl -i splited/filted.fa -o {uparsed_fa}
+perl ~/tools/BMP/bmp-Qiime2Uparse.pl -i splited/filted.fa -o splited/uparsed.fa
 
 #7
-usearch -fastx_uniques splited/filted.fa -fastaout splited/derep.fa -sizeout
+usearch -fastx_uniques splited/uparsed.fa -fastaout splited/derep.fa -sizeout
 
 
 #9
 mkdir analysis;usearch -cluster_otus splited/derep.fa -otus analysis/otus_rep.fa -relabel OTU
 
 #10
-usearch -otutab splited/seqs.fastq -otus analysis/otus_rep.fa -otutabout analysis/otu_raw.tab -sample_delim _
+usearch -otutab splited/uparsed.fa -otus analysis/otus_rep.fa -otutabout analysis/otu_raw.tab -sample_delim _
 
 #
 biom summarize-table -i analysis/otu_raw.tab
