@@ -1,4 +1,8 @@
-from __future__ import print_function
+"""
+Stacked bar plot for summarizing the taxonomic classification of 16S analysis
+
+"""
+
 import plotly,random,os
 from plotly import graph_objs as go
 from utils import read_data
@@ -6,35 +10,93 @@ import seaborn as sns
 
 
 
-def parse_data(tax,tax_otus_index,tax_otu_sub,colors):
+def parse_data(tax,tax_otu_sub,colors):
     bucket = []
     if tax != 'family':
         judge = False
     else:
         judge = True
 
-    for idx,_i in enumerate(list(tax_otus_index)):
+    for col_name,col in tax_otu_sub.iteritems():
         # loop it and raw each OTU(taxed)
         bucket.append(go.Bar(
-            x = tax_otu_sub.columns,
-            y = tax_otu_sub.loc[_i,:]/tax_otu_sub.sum(0), # Normalization with each sample.
+            x = col.index,
+            y = col/tax_otu_sub.sum(1), # Normalization with each sample.
             visible = judge,
-            name=_i,
+            name=col_name,
             # name will display at legend.
-            marker=dict(color=colors[idx],
+            marker=dict(color=colors[list(tax_otu_sub.columns).index(col_name)],
                         line=dict(width=1,color='#FFFFFF')
                         # use white line to separate the bar, it can use it to make it more clear.
                         )
         ))
     return bucket
 
-# def sort_way(taxotu_columns):
-#     return sorted(list(taxotu_columns))
 
-def sort_way(taxotu_columns):
-    sort_for = [(k.rpartition('_')[-1],k) if '.' not in k else (k.rpartition('_')[-1].split('.')[-1],k) for k in list(taxotu_columns)]
-    result = [k for i,k in sorted(sort_for)]
-    return result
+
+sra = "SRP114750"
+repr_fa = f"./SRA_study/{sra}/analysis/{sra}_repr_dada2.fa"
+ab_tab = repr_fa.replace("_repr_dada2.fa","_table_dada2.csv")
+otab = dirname(repr_fa)+'/repr2rdp.tab'
+level = 'pfg'
+result_dfs = summarize_tax(otab,ab_tab,level=level,threadhold=0.8)
+
+def generate_html(result_dfs,ofile):
+    tax2dis = {}
+    for tax_name,(tax_otutab_norm,tax_otutab_sum) in zip('pfg',result_dfs):
+        tax_otu = tax_otutab_sum
+        tax_otu.loc[:,'sum_all'] = tax_otu.sum(1)
+        # sum all samples reads in each OTU(taxed).
+        tax_otu.sort_values('sum_all',ascending=False,inplace=True)
+        # Use total reads to sort in order to make big OTU been drawn above.
+        tax_otu_sub = tax_otu.iloc[:,:-1]
+        # deleted the sum_all columns.
+
+        #processing lot of colors
+        data = []
+        colors = sns.husl_palette(len(tax_otu.columns))
+        random.shuffle(colors)
+        
+        colors = colors.as_hex()
+        
+        tax2dis[tax_name] = parse_data(tax_name, tax_otu_sub, colors)
+        
+    family_shows = [True] * len(tax2dis['f']) + [False] * len(tax2dis['g']) + [False] * len(tax2dis['g'])
+    genus_shows =  [False] * len(tax2dis['f']) + [True] * len(tax2dis['g']) + [False] * len(tax2dis['g'])
+    phylum_shows = [False] * len(tax2dis['f']) + [False] * len(tax2dis['g']) + [True] * len(tax2dis['g'])
+        
+    updatemenus = list([
+        dict(type="buttons",
+                active=1,
+                buttons=list([
+                    dict(label = 'phylum',
+                        method = 'restyle',
+                        args = ['visible', phylum_shows]),
+                dict(label = 'family',
+                        method = 'restyle',
+                        args = ['visible', family_shows]),
+                dict(label = 'genus',
+                        method = 'restyle',
+                        args = ['visible', genus_shows]),
+                    # dict(label = 'OTU',
+                    #  method = 'restyle',
+                    #  args = ['visible', OTU_shows])
+            ]),
+        )
+    ])
+
+
+    layout = go.Layout(
+        title='Taxonomic distribution Plus',
+        barmode='stack',
+        #height=2000,
+        updatemenus=updatemenus
+
+    )
+    fig = go.Figure(data=tax2dis['f']+tax2dis['g']+tax2dis['p'], layout=layout)
+    fig.write_html(ofile,include_plotlyjs='cdn')
+
+
 
 def generate_html():
     for tax_otutab in tax_otutabs:

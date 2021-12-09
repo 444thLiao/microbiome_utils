@@ -1,11 +1,10 @@
-from __future__ import print_function
 import argparse
 import os
 import pandas
 import pickle
 import random
 from collections import defaultdict, Counter
-from multiprocessing import Pool,Manager
+from multiprocessing import Pool, Manager
 from utils import read_data
 import plotly
 import plotly.graph_objs as go
@@ -79,19 +78,21 @@ def subsampling2(ori_df, num, prebuild=None):
     return sub_df.astype(int)
 
 
-def generate_step(step,maxiumn):
+def generate_step(step, maxiumn):
     "For generate unequal step for draw more smooth rarefaction curve"
     generate_range = []
-    small_bin = range(0,step+1,100)[1:]
-    for idx,small_max in enumerate(small_bin[1:]):
-        for s_step in range(small_bin[idx],small_max+1,int(small_bin[idx]/10)):
+    small_bin = range(0, step+1, 100)[1:]
+    for idx, small_max in enumerate(small_bin[1:]):
+        for s_step in range(small_bin[idx], small_max+1, int(small_bin[idx]/10)):
             generate_range.append(s_step)
-    return generate_range+list(range(step,maxiumn+1,step))
+    return generate_range+list(range(step, maxiumn+1, step))
 
-def multiprocess_subsample(bucket,ori_otu, num, prebuild_dict):
+
+def multiprocess_subsample(bucket, ori_otu, num, prebuild_dict):
     bucket.extend([subsampling(ori_otu, num, prebuild=prebuild_dict)])
 
-def diversity_ana(metric,subsample,ids,**kwargs):
+
+def diversity_ana(metric, subsample, ids, **kwargs):
     if metric == 'faith_pd':
         each = alpha_diversity('faith_pd', subsample, ids=ids,
                                otu_ids=kwargs['otu_ids'], tree=kwargs['tree'])
@@ -103,9 +104,11 @@ def diversity_ana(metric,subsample,ids,**kwargs):
         try:
             each = alpha_diversity(metric, subsample, ids=ids)
         except:
-            print('Metric you can use is listed below: \n' + '\n'.join(get_alpha_diversity_metrics()))
+            print('Metric you can use is listed below: \n' +
+                  '\n'.join(get_alpha_diversity_metrics()))
             exit()
     return each
+
 
 # Start cal alpha diversity
 if __name__ == '__main__':
@@ -113,13 +116,19 @@ if __name__ == '__main__':
     If you want to do example. Like """)
     parser.add_argument('-t', "--tree", help="Otus tree in newick format.")
     parser.add_argument('-i', "--input", help="Otus table")
-    parser.add_argument('-m', "--metadata", help="Metadata to parse otus sample id into normal or other group name.")
-    parser.add_argument('-o', "--output", help="Output dir, File name dosen't need to set.")
+    parser.add_argument(
+        '-m', "--metadata", help="Metadata to parse otus sample id into normal or other group name.")
+    parser.add_argument(
+        '-o', "--output", help="Output dir, File name dosen't need to set.")
 
-    parser.add_argument('-M', "--metric", help="Metric you want to use.[default: %(default)s]", default='faith_pd')
-    parser.add_argument('-s', "--step", help="Subsampling step [default: %(default)s]", default=500)
-    parser.add_argument('-r', "--repeat", help="Subsampling iteration num [default: %(default)s]", default=100)
-    parser.add_argument('-thread', help="subsampleing process. [default: %(default)s]", default=25)
+    parser.add_argument(
+        '-M', "--metric", help="Metric you want to use.[default: %(default)s]", default='faith_pd')
+    parser.add_argument(
+        '-s', "--step", help="Subsampling step [default: %(default)s]", default=500)
+    parser.add_argument(
+        '-r', "--repeat", help="Subsampling iteration num [default: %(default)s]", default=100)
+    parser.add_argument(
+        '-thread', help="subsampleing process. [default: %(default)s]", default=25)
     parser.add_argument('-cols',
                         help="which columns in 'metadata' you need to parse name in distance to. [default: %(default)s]",
                         default='class')
@@ -137,7 +146,8 @@ if __name__ == '__main__':
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
     if args.list_metric:
-        print('Metric you can use is listed below: \n' + '\n'.join(get_alpha_diversity_metrics()))
+        print('Metric you can use is listed below: \n' +
+              '\n'.join(get_alpha_diversity_metrics()))
         exit()
     metric = args.metric
     if ',' in metric:
@@ -160,9 +170,11 @@ if __name__ == '__main__':
     print('Start building the query dict')
     prebuild_dict = defaultdict(list)
     for s in list(ori_otu.columns):
-        prebuild_dict[s] = sum(map(lambda y: [y[0]] * y[1], zip(ori_otu.index, list(ori_otu.loc[:, s]))), [])
-        # for r in list(ori_otu.index):
-        #     prebuild_dict[s] += [r] * ori_otu.loc[r, s]
+        prebuild_dict[s] = sum(map(lambda y: [y[0]] * int(y[1]),
+                                   zip(ori_otu.index,
+                                       list(ori_otu.loc[:, s]))),
+                               [])
+        # make it into a dict which showing each sample to the real number of each OTU
 
     print('Down the query dict. Start the progressBar.')
     # Build the query dict.
@@ -173,8 +185,8 @@ if __name__ == '__main__':
     # with tqdm.tqdm(pbar_total) as pbar:
     #pbar = progressbar.ProgressBar().start()
     df_b = defaultdict(list)
-    for _idx, num in enumerate(tqdm.tqdm(generate_step(step,min(ori_otu.sum(0))))):
-    # for _idx, num in enumerate(generate_step(step,min(ori_otu.sum(0)))):
+    for _idx, num in enumerate(tqdm.tqdm(generate_step(step, min(ori_otu.sum(0))))):
+        # for _idx, num in enumerate(generate_step(step,min(ori_otu.sum(0)))):
         # subsampling step.
         current = defaultdict(list)
 
@@ -183,35 +195,43 @@ if __name__ == '__main__':
         p = Pool(int(threads))
 
         if num < step:
-            repeat_times = repeat *5
+            repeat_times = repeat * 5
         else:
             repeat_times = repeat
 
         for _ in range(repeat_times):
             p.apply_async(multiprocess_subsample,
-                               args=(subsampled,ori_otu, num, prebuild_dict))
+                          args=(subsampled, ori_otu, num, prebuild_dict))
         p.close()
         p.join()
 
         for _m in metric:
-            current[_m] = [diversity_ana(_m, temp.values.tolist(), list(ori_otu.columns), otu_ids=list(ori_otu.index),
-                                         tree=tree) for temp in subsampled]
+            current[_m] = [diversity_ana(_m,
+                                         temp.values.tolist(),
+                                         list(ori_otu.columns),
+                                         otu_ids=list(ori_otu.index),
+                                         tree=tree)
+                           for temp in subsampled]
 
             current[_m] = sum(current[_m])
             if subsampled:
-                current[_m] = current[_m] / len(subsampled) # one 'step' is run 'repeat' time for smooth the curve.
+                # one 'step' is run 'repeat' time for smooth the curve.
+                current[_m] = current[_m] / len(subsampled)
             else:
-                import pdb;pdb.set_trace()
+                import pdb
+                pdb.set_trace()
                 current[_m] = 0
 
-            df_b[_m].append(df(current[_m]).T) # collect all the DataFrame which have the values in each step.
+            # collect all the DataFrame which have the values in each step.
+            df_b[_m].append(df(current[_m]).T)
 
     result = {}
     for _m in df_b.keys():
-        result[_m] = pandas.concat(df_b[_m]) # sum them up.
-        result[_m].index = generate_step(step,min(ori_otu.sum(0))) # assign the index.
+        result[_m] = pandas.concat(df_b[_m])  # sum them up.
+        # assign the index.
+        result[_m].index = generate_step(step, min(ori_otu.sum(0)))
 
-    #Drawing part
+    # Drawing part
     for _m in result.keys():
         datas = []
         if metadata:
@@ -238,8 +258,8 @@ if __name__ == '__main__':
 
         layout = go.Layout(
             title='Rarefaction curve(%s)' % _m.title(),
-            xaxis = dict(title = 'Reads count'),
-            yaxis = dict(title = '%s' % _m.title())
+            xaxis=dict(title='Reads count'),
+            yaxis=dict(title='%s' % _m.title())
         )
         fig = go.Figure(data=datas, layout=layout)
         # put data and layout config into one.
@@ -247,8 +267,8 @@ if __name__ == '__main__':
         fn = output_dir + '/rarefaction_curve(%s)' % _m.title()
         # construct a dir to storge result[_m].
         if args.output_fig:
-        # In case to reuse the data, we can use package pickle to storge the fig into file.
-        # You can use pickle.load to reuse the fig data instead of plot it.
+            # In case to reuse the data, we can use package pickle to storge the fig into file.
+            # You can use pickle.load to reuse the fig data instead of plot it.
             pickle.dump(fig, args.output_fig)
 
         if not os.path.isfile(fn):

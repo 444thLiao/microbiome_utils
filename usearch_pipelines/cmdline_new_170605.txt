@@ -57,3 +57,6 @@ usearch -otutab_trim analysis/otu_raw_filterd_5k.tab -min_otu_freq 0.001 -output
 
 #last
 python mircobiome_utils/routine_analysis.py
+
+
+
